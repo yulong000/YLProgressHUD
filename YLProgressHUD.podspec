@@ -16,7 +16,7 @@ Pod::Spec.new do |spec|
   spec.author       = { "魏宇龙" => "weiyulong1987@163.com" }
   spec.platform     = :macos, "10.14"
   spec.source       = { :git => "https://github.com/yulong000/YLProgressHUD.git", :tag => "#{spec.version}" }
-  spec.source_files = "YLProgressHUD/YLProgressHUD/**",
+  spec.source_files = "YLProgressHUD/YLProgressHUD/*.{h,m}",
   spec.resource     = "YLProgressHUD/YLProgressHUD/YLProgressHUD.bundle"
   spec.public_header_files = "YLProgressHUD/YLProgressHUD/YLProgressHUD.h"
   spec.requires_arc = true
