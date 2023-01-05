@@ -13,14 +13,7 @@
 #define kHUDMaxWidth            300         // 最大的宽度，超过宽度换行
 
 // 判断当前app是否是深色模式
-#define kAppIsDarkTheme                \
-^ BOOL {                                                                                    \
-    if (@available(macOS 11.0, *)) {                                                        \
-        return [NSAppearance currentDrawingAppearance].name != NSAppearanceNameAqua;        \
-    } else {                                                                                \
-        return [NSAppearance currentAppearance].name != NSAppearanceNameAqua;               \
-    }                                                                                       \
-}()                                                                                         \
+#define kAppIsDarkTheme         ([NSApp.effectiveAppearance bestMatchFromAppearancesWithNames:@[NSAppearanceNameDarkAqua, NSAppearanceNameAqua]] == NSAppearanceNameDarkAqua)
 
 #pragma mark - 显示进度
 
@@ -146,7 +139,6 @@
         self.level = NSPopUpMenuWindowLevel;
         self.styleMask = NSWindowStyleMaskBorderless;
         self.releasedWhenClosed = NO;
-        self.contentView = [[NSImageView alloc] init];
 
         self.hudView = [[YLProgressHUDView alloc] init];
         [self.contentView addSubview:self.hudView];
@@ -176,24 +168,12 @@
 
 - (void)setStyle:(YLProgressHUDStyle)style {
     if(style == YLProgressHUDStyleAuto) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
         _style = kAppIsDarkTheme ? YLProgressHUDStyleWhite : YLProgressHUDStyleBlack;
-#pragma clang diagnostic pop
     } else {
         _style = style;
     }
     self.hudView.style = _style;
     self.textLabel.textColor = _style == YLProgressHUDStyleBlack ? [NSColor whiteColor] : [NSColor blackColor];
-    if(self.customView) {
-        if([self.customView isKindOfClass:[NSImageView class]]) {
-            [YLProgressHUD setImageView:(NSImageView *)self.customView withStyle:_style];
-        } else if([self.customView isKindOfClass:[NSProgressIndicator class]]) {
-            [(NSProgressIndicator *)self.customView setContentFilters:@[[YLProgressHUD createColorFilterWithStyle:_style]]];
-        } else if([self.customView isKindOfClass:[YLProgressDisplayView class]]) {
-            [(YLProgressDisplayView *)self.customView setStyle:_style];
-        }
-    }
 }
 
 - (void)dealloc {
@@ -385,7 +365,6 @@
 }
 
 - (void)showText:(NSString *)text hideAfterDelay:(CGFloat)second completionHandler:(YLProgressHUDCompletionHandler)completionHandler {
-    [self loadBackgroudImage];
     [self.customView removeFromSuperview];
     self.customView = nil;
     self.textLabel.stringValue = text ?: @"";
@@ -414,7 +393,6 @@
 }
 
 - (void)showSuccess:(NSString *)success hideAfterDelay:(CGFloat)second completionHandler:(YLProgressHUDCompletionHandler)completionHandler {
-    [self loadBackgroudImage];
     [self.customView removeFromSuperview];
     self.customView = [YLProgressHUD createSuccessViewWithStyle:self.style];
     [self.hudView addSubview:self.customView];
@@ -444,7 +422,6 @@
 }
 
 - (void)showError:(NSString *)error hideAfterDelay:(CGFloat)second completionHandler:(YLProgressHUDCompletionHandler)completionHandler {
-    [self loadBackgroudImage];
     [self.customView removeFromSuperview];
     self.customView = [YLProgressHUD createErrorViewWithStyle:self.style];
     [self.hudView addSubview:self.customView];
@@ -466,19 +443,19 @@
 }
 
 - (void)showProgress:(CGFloat)progress text:(NSString * _Nullable)text {
-    [self loadBackgroudImage];
-    [self.customView removeFromSuperview];
-    YLProgressDisplayView *progressView = [YLProgressHUD createProgressViewWithStyle:self.style];
-    progressView.progress = progress;
-    self.customView = progressView;
-    [self.hudView addSubview:self.customView];
-    self.textLabel.stringValue = text ?: progressView.progressText;
+    if([self.customView isKindOfClass:[YLProgressDisplayView class]]) {
+        YLProgressDisplayView *progressView = (YLProgressDisplayView *)(self.customView);
+        progressView.progress = progress;
+        self.textLabel.stringValue = text ?: progressView.progressText;
+    } else {
+        [self.customView removeFromSuperview];
+        YLProgressDisplayView *progressView = [YLProgressHUD createProgressViewWithStyle:self.style];
+        progressView.progress = progress;
+        self.customView = progressView;
+        [self.hudView addSubview:self.customView];
+        self.textLabel.stringValue = text ?: progressView.progressText;
+    }
     [self layoutSubviews];
-}
-
-- (void)loadBackgroudImage {
-    // 截取父window的内容作为背景，解决hud尺寸变化时的残影问题
-    [(NSImageView *)self.contentView setImage:[self getThumbImageFromView:self.parentWindow.contentView]];
 }
 
 #pragma mark 获取view的截图
@@ -509,6 +486,9 @@
 }
 
 + (void)setImageView:(NSImageView *)imageView withStyle:(YLProgressHUDStyle)style {
+    if(style == YLProgressHUDStyleAuto) {
+        style = kAppIsDarkTheme ? YLProgressHUDStyleWhite : YLProgressHUDStyleBlack;
+    }
     if(imageView.tag == 10000) {
         // 成功
         if(style == YLProgressHUDStyleBlack) {
@@ -536,9 +516,14 @@
 }
 
 + (CIFilter *)createColorFilterWithStyle:(YLProgressHUDStyle)style {
-    NSColor *color = [[NSColor whiteColor] colorUsingColorSpace:[NSColorSpace deviceRGBColorSpace]];
+    if(style == YLProgressHUDStyleAuto) {
+        style = kAppIsDarkTheme ? YLProgressHUDStyleWhite : YLProgressHUDStyleBlack;
+    }
+    NSColor *color;
     if(style == YLProgressHUDStyleWhite) {
         color = [[NSColor blackColor] colorUsingColorSpace:[NSColorSpace deviceRGBColorSpace]];
+    } else {
+        color = [[NSColor whiteColor] colorUsingColorSpace:[NSColorSpace deviceRGBColorSpace]];
     }
     CIVector *min = [CIVector vectorWithX:color.redComponent Y:color.greenComponent Z:color.blueComponent W:0];
     CIVector *max = [CIVector vectorWithX:color.redComponent Y:color.greenComponent Z:color.blueComponent W:1.0];
@@ -551,6 +536,9 @@
 
 #pragma mark 获取进度的view
 + (YLProgressDisplayView *)createProgressViewWithStyle:(YLProgressHUDStyle)style {
+    if(style == YLProgressHUDStyleAuto) {
+        style = kAppIsDarkTheme ? YLProgressHUDStyleWhite : YLProgressHUDStyleBlack;
+    }
     YLProgressDisplayView *progressView = [[YLProgressDisplayView alloc] initWithFrame:NSMakeRect(0, 0, 40, 40)];
     progressView.style = style;
     return progressView;
