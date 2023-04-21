@@ -9,7 +9,7 @@
 Pod::Spec.new do |spec|
 
   spec.name         = "YLProgressHUD"
-  spec.version      = "0.0.2"
+  spec.version      = "0.0.3"
   spec.summary      = "macos开发，hud显示"
   spec.homepage     = "https://github.com/yulong000/YLProgressHUD.git"
   spec.license      = "MIT"

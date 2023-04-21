@@ -93,13 +93,12 @@
 
 - (void)resetShadow {
     NSShadow *shadow = [[NSShadow alloc] init];
-    shadow.shadowColor = [NSColor colorWithRed:0 green:0 blue:0 alpha:0.3];
     shadow.shadowBlurRadius = 5;
     if(self.style == YLProgressHUDStyleBlack) {
-        self.layer.backgroundColor = [NSColor colorWithRed:0 green:0 blue:0 alpha:0.6].CGColor;
+        self.layer.backgroundColor = [NSColor colorWithRed:0 green:0 blue:0 alpha:0.7].CGColor;
         shadow.shadowColor = [NSColor colorWithRed:0 green:0 blue:0 alpha:0.3];
     } else {
-        self.layer.backgroundColor = [NSColor colorWithRed:1 green:1 blue:1 alpha:0.6].CGColor;
+        self.layer.backgroundColor = [NSColor colorWithRed:1 green:1 blue:1 alpha:0.7].CGColor;
         shadow.shadowColor = [NSColor colorWithRed:1 green:1 blue:1 alpha:0.3];
     }
     self.shadow = shadow;
@@ -135,10 +134,13 @@
 - (instancetype)init {
     if (self = [super init]) {
         
-        self.backgroundColor = [NSColor colorWithWhite:0 alpha:0.005];
+        self.backgroundColor = [NSColor clearColor];
         self.level = NSPopUpMenuWindowLevel;
         self.styleMask = NSWindowStyleMaskBorderless;
         self.releasedWhenClosed = NO;
+        self.contentView.wantsLayer = YES;
+        self.contentView.layer.cornerRadius = 10;
+        self.contentView.layer.masksToBounds = YES;
 
         self.hudView = [[YLProgressHUDView alloc] init];
         [self.contentView addSubview:self.hudView];
@@ -153,15 +155,17 @@
         
         self.style = [YLProgressHUDConfig share].style;
         
-        __weak typeof(self) weakSelf = self;
-        self.monitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDragged handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-            if(event.window == weakSelf) {
-                // 让窗口响应鼠标的拖动
-                NSPoint parentWindowOrigin = weakSelf.parentWindow.frame.origin;
-                [weakSelf.parentWindow setFrameOrigin:NSMakePoint(parentWindowOrigin.x + event.deltaX, parentWindowOrigin.y - event.deltaY)];
-            }
-            return event;
-        }];
+        if([YLProgressHUDConfig share].movable) {
+            __weak typeof(self) weakSelf = self;
+            self.monitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDragged handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+                if(event.window == weakSelf) {
+                    // 让窗口响应鼠标的拖动
+                    NSPoint parentWindowOrigin = weakSelf.parentWindow.parentWindow.frame.origin;
+                    [weakSelf.parentWindow.parentWindow setFrameOrigin:NSMakePoint(parentWindowOrigin.x + event.deltaX, parentWindowOrigin.y - event.deltaY)];
+                }
+                return event;
+            }];
+        }
     }
     return self;
 }
@@ -177,18 +181,22 @@
 }
 
 - (void)dealloc {
-    [NSEvent removeMonitor:self.monitor];
+    if(self.monitor) {
+        [NSEvent removeMonitor:self.monitor];
+    }
 }
 
-- (void)layoutSubviews {
+- (void)layoutUI {
     // 上下左右留白 20， text customView 间距 20
     if(self.textLabel.stringValue.length > 0) {
         [self.textLabel setFrameSize:[self.textLabel sizeThatFits:NSMakeSize(kHUDMaxWidth - 40, MAXFLOAT)]];
     } else {
         [self.textLabel setFrameSize:NSZeroSize];
     }
-    CGFloat windowWidth = self.contentView.frame.size.width;
-    CGFloat windowHeight = self.contentView.frame.size.height;
+    CGFloat windowWidth = self.parentWindow.frame.size.width;
+    CGFloat windowHeight = self.parentWindow.frame.size.height;
+    CGFloat windowX = self.parentWindow.frame.origin.x;
+    CGFloat windowY = self.parentWindow.frame.origin.y;
     CGFloat textLabelWidth = self.textLabel.frame.size.width;
     CGFloat textLabelHeight = self.textLabel.frame.size.height;
     CGFloat customViewWidth = self.customView.frame.size.width;
@@ -209,7 +217,9 @@
         [self.hudView setFrameSize:NSMakeSize(hudWidth, hudHeight)];
         [self.textLabel setFrameOrigin:NSMakePoint(20, 20)];
     }
-    [self.hudView setFrameOrigin:NSMakePoint((windowWidth - hudWidth) / 2, (windowHeight - hudHeight) / 2)];
+    
+    NSRect frame = NSMakeRect((windowWidth - hudWidth) / 2 + windowX, (windowHeight - hudHeight) / 2 + windowY, hudWidth, hudHeight);
+    [self setFrame:frame display:YES];
 }
 
 #pragma mark - 显示成功
@@ -289,16 +299,31 @@
 
 #pragma mark - 显示自定义view和文字
 + (instancetype)showCustomView:(NSView * _Nullable)customView text:(NSString *)text toWindow:(NSWindow *)window hideAfterDelay:(CGFloat)second completionHandler:(YLProgressHUDCompletionHandler _Nullable)completionHandler {
+    if(window == nil) {
+        window = NSApp.keyWindow;
+    }
+    // 增加一个全覆盖的window，禁用点击其他地方，如果设置为[NSColor clearColor]，鼠标是可以穿透的，所以必须得有个色值
+    // Q：为啥不直接设置hud为全覆盖呢？
+    // A：因为半透明的window，对其上面的view做动画或者frame更改的时候，会有残影，应该是系统bug，所以简单粗暴，直接再套一层
+    NSWindow *parentWindow = [[NSWindow alloc] init];
+    parentWindow.backgroundColor = [NSColor colorWithWhite:0 alpha:0.001];
+    parentWindow.level = NSPopUpMenuWindowLevel;
+    parentWindow.styleMask = NSWindowStyleMaskBorderless;
+    [parentWindow setFrame:window.frame display:YES];
+    parentWindow.movable = NO;
+    parentWindow.releasedWhenClosed = NO;
+    [window addChildWindow:parentWindow ordered:NSWindowAbove];
+    
+    // 这个是要显示的小窗口
     YLProgressHUD *hud = [[YLProgressHUD alloc] init];
+    [parentWindow addChildWindow:hud ordered:NSWindowAbove];
     hud.textLabel.stringValue = text ?: @"";
     hud.completionHandler = completionHandler;
     if(customView) {
         hud.customView = customView;
         [hud.hudView addSubview:customView];
     }
-    [window addChildWindow:hud ordered:NSWindowAbove];
-    [hud setFrame:window.frame display:YES];
-    [hud layoutSubviews];
+    [hud layoutUI];
     if(second >= 0) {
         // 自动隐藏
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(second * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -314,14 +339,18 @@
     if(hud.completionHandler) {
         hud.completionHandler();
     }
+    [hud.parentWindow.parentWindow removeChildWindow:hud.parentWindow];
+    [hud.parentWindow close];
     [hud.parentWindow removeChildWindow:hud];
     [hud close];
 }
 
 + (void)hideHUDForWindow:(NSWindow *)window {
-    for (YLProgressHUD *hud in window.childWindows) {
-        if([hud isKindOfClass:[YLProgressHUD class]]) {
-            [YLProgressHUD hideHUD:hud];
+    for (NSWindow *child in window.childWindows) {
+        if([child isKindOfClass:[YLProgressHUD class]]) {
+            [YLProgressHUD hideHUD:(YLProgressHUD *)child];
+        } else {
+            [YLProgressHUD hideHUDForWindow:child];
         }
     }
 }
@@ -347,7 +376,7 @@
 
 - (void)showLoading:(NSString *)loading {
     self.textLabel.stringValue = loading ?: @"";
-    [self layoutSubviews];
+    [self layoutUI];
 }
 
 #pragma mark 文字
@@ -369,7 +398,7 @@
     self.customView = nil;
     self.textLabel.stringValue = text ?: @"";
     self.completionHandler = completionHandler;
-    [self layoutSubviews];
+    [self layoutUI];
     if(second >= 0) {
         // 自动隐藏
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(second * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -398,7 +427,7 @@
     [self.hudView addSubview:self.customView];
     self.textLabel.stringValue = success ?: @"";
     self.completionHandler = completionHandler;
-    [self layoutSubviews];
+    [self layoutUI];
     if(second >= 0) {
         // 自动隐藏
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(second * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -427,7 +456,7 @@
     [self.hudView addSubview:self.customView];
     self.textLabel.stringValue = error ?: @"";
     self.completionHandler = completionHandler;
-    [self layoutSubviews];
+    [self layoutUI];
     if(second >= 0) {
         // 自动隐藏
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(second * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -455,7 +484,7 @@
         [self.hudView addSubview:self.customView];
         self.textLabel.stringValue = text ?: progressView.progressText;
     }
-    [self layoutSubviews];
+    [self layoutUI];
 }
 
 #pragma mark 获取view的截图
@@ -568,6 +597,7 @@
     dispatch_once(&onceToken, ^{
         config = [[YLProgressHUDConfig alloc] init];
         config.style = YLProgressHUDStyleAuto;
+        config.movable = YES;
     });
     return config;
 }

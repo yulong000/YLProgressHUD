@@ -22,10 +22,12 @@ typedef void (^YLProgressHUDCompletionHandler)(void);
 
 @interface YLProgressHUDConfig : NSObject
 
-/// 显示的样式，default is YLProgressHUDStyleBlack
+/// 显示的样式
 @property (nonatomic, assign) YLProgressHUDStyle style;
 /// 显示的文字的字体
 @property (nonatomic, strong, nullable) NSFont *textFont;
+/// 是否可以通过拖动移动背后的window， default = yes
+@property (nonatomic, assign) BOOL movable;
 
 + (instancetype)share;
 
@@ -35,7 +37,7 @@ typedef void (^YLProgressHUDCompletionHandler)(void);
 
 @interface YLProgressHUD : NSWindow
 
-/// 显示的样式，default is YLProgressHUDStyleBlack
+/// 显示的样式
 @property (nonatomic, assign) YLProgressHUDStyle style;
 
 #pragma mark - 成功 （自动隐藏）
