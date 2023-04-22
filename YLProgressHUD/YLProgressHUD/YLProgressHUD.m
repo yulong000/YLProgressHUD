@@ -93,13 +93,13 @@
 
 - (void)resetShadow {
     NSShadow *shadow = [[NSShadow alloc] init];
-    shadow.shadowBlurRadius = 5;
+    shadow.shadowBlurRadius = 3;
     if(self.style == YLProgressHUDStyleBlack) {
-        self.layer.backgroundColor = [NSColor colorWithRed:0 green:0 blue:0 alpha:0.7].CGColor;
-        shadow.shadowColor = [NSColor colorWithRed:0 green:0 blue:0 alpha:0.3];
+        self.layer.backgroundColor = [NSColor colorWithRed:0 green:0 blue:0 alpha:0.9].CGColor;
+        shadow.shadowColor = [NSColor colorWithRed:0 green:0 blue:0 alpha:0.4];
     } else {
-        self.layer.backgroundColor = [NSColor colorWithRed:1 green:1 blue:1 alpha:0.7].CGColor;
-        shadow.shadowColor = [NSColor colorWithRed:1 green:1 blue:1 alpha:0.3];
+        self.layer.backgroundColor = [NSColor colorWithRed:1 green:1 blue:1 alpha:0.9].CGColor;
+        shadow.shadowColor = [NSColor colorWithRed:1 green:1 blue:1 alpha:0.4];
     }
     self.shadow = shadow;
 }
@@ -138,9 +138,6 @@
         self.level = NSPopUpMenuWindowLevel;
         self.styleMask = NSWindowStyleMaskBorderless;
         self.releasedWhenClosed = NO;
-        self.contentView.wantsLayer = YES;
-        self.contentView.layer.cornerRadius = 10;
-        self.contentView.layer.masksToBounds = YES;
 
         self.hudView = [[YLProgressHUDView alloc] init];
         [self.contentView addSubview:self.hudView];
@@ -217,9 +214,13 @@
         [self.hudView setFrameSize:NSMakeSize(hudWidth, hudHeight)];
         [self.textLabel setFrameOrigin:NSMakePoint(20, 20)];
     }
-    
+    // 扩大window的size，给阴影留些显示的空间
+    hudWidth += 10;
+    hudHeight += 10;
     NSRect frame = NSMakeRect((windowWidth - hudWidth) / 2 + windowX, (windowHeight - hudHeight) / 2 + windowY, hudWidth, hudHeight);
     [self setFrame:frame display:YES];
+    // hud居中
+    [self.hudView setFrameOrigin:NSMakePoint(5, 5)];
 }
 
 #pragma mark - 显示成功

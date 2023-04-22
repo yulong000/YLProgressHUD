@@ -9,7 +9,7 @@
 Pod::Spec.new do |spec|
 
   spec.name         = "YLProgressHUD"
-  spec.version      = "0.0.3"
+  spec.version      = "0.0.4"
   spec.summary      = "macos开发，hud显示"
   spec.homepage     = "https://github.com/yulong000/YLProgressHUD.git"
   spec.license      = "MIT"
@@ -26,4 +26,4 @@ end
 
 # 升级时  1.add tag
 #        2.push tag
-#        3.pod trunk push YLCategory-MacOS.podspec
+#        3.pod trunk push YLProgressHUD.podspec

@@ -25,11 +25,16 @@
     [self.view addSubview:loading];
     [self.view addSubview:progress];
     
+    NSTextField *label = [NSTextField labelWithString:@"这是一段文字"];
+    [self.view addSubview:label];
+    
     success.frame = NSMakeRect(50, 150, 100, 22);
     error.frame = NSMakeRect(50, 120, 100, 22);
     text.frame = NSMakeRect(50, 90, 100, 22);
     loading.frame = NSMakeRect(50, 60, 100, 22);
     progress.frame = NSMakeRect(50, 30, 100, 22);
+    
+    label.frame = NSMakeRect(200, 150, 200, 20);
 }
 
 - (void)showSuccess {
@@ -48,8 +53,8 @@
     YLProgressHUD *hud = [YLProgressHUD showLoading:@"加载中..." toWindow:self.view.window];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
 //        [hud hide];
-        [self hideLoading];
-//        [hud showText:@"下载完成啦"];
+//        [self hideLoading];
+        [hud showText:@"下载完成啦啦啦啦啦啦"];
     });
 }
 
